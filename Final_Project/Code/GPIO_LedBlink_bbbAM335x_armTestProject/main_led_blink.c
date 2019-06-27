@@ -133,14 +133,14 @@
 #define INT_NUMBER_GPIO_3_B (63)
 
 #define TASK_CALIBRADOR_PRIORIDADE  (5)
-#define TASK_READ_ROTA_PRIORIDADE   (7)
-#define TASK_R1_PRIORIDADE          (9)
-#define TASK_R2_PRIORIDADE          (11)
-#define TASK_R3_PRIORIDADE          (13)
-#define TASK_R4_PRIORIDADE          (15)
+#define TASK_READ_ROTA_PRIORIDADE   (4)
+#define TASK_R1_PRIORIDADE          (2)
+#define TASK_R2_PRIORIDADE          (2)
+#define TASK_R3_PRIORIDADE          (2)
+#define TASK_R4_PRIORIDADE          (2)
 
-#define TASK_CALIBRADOR_PERIODO  (2)
-#define TASK_READ_ROTA_PERIODO   (5)
+#define TASK_CALIBRADOR_PERIODO  (10)
+#define TASK_READ_ROTA_PERIODO   (1000)
 #define TASK_R1_PERIODO          (1)
 #define TASK_R2_PERIODO          (1)
 #define TASK_R3_PERIODO          (1)
@@ -148,6 +148,10 @@
 
 #define STATUS_PEND     (0)
 #define STATUS_POST     (1)
+
+#define NUMBER_OF_SAMPLE (5)
+
+#define NUMBER_TIMER_MAX_WAITING    (5)
 //-------------------------  FIM Defines Final Project   --------------------
 /**********************************************************************
  ************************** Internal functions ************************
@@ -169,6 +173,11 @@ void swiFuncR2();
 void swiFuncR3();
 void swiFuncR4();
 
+void ISR_SIGNAL_FL_SPEED_SENSOR();
+void ISR_SIGNAL_FR_SPEED_SENSOR();
+void ISR_SIGNAL_RL_SPEED_SENSOR();
+void ISR_SIGNAL_RR_SPEED_SENSOR();
+void ISR_USER_CONTROL();
 /* Callback function */
 void AppGpioCallbackFxn(void);
 
@@ -559,6 +568,16 @@ uint8_t cflag_R1;
 uint8_t cflag_R2;
 uint8_t cflag_R3;
 uint8_t cflag_R4;
+
+uint8_t number_of_sample_current = 0;
+
+u_int8_t cflag_init_read_rota = FALSE;
+u_int8_t cflag_init_R1 = FALSE;
+u_int8_t cflag_init_R2 = FALSE;
+u_int8_t cflag_init_R3 = FALSE;
+u_int8_t cflag_init_R4 = FALSE;
+
+u_int8_t cflag_number_count = 0;
 /*
  *  ======== test function ========
  */
@@ -687,29 +706,29 @@ int main(void)
         GPIOIntTypeSet(SOC_GPIO_0_REGS, SIGNAL_RR_SPEED_SENSOR, GPIO_INT_TYPE_RISE_EDGE);
         GPIOPinIntEnable(SOC_GPIO_0_REGS, GPIO_INT_LINE_1, SIGNAL_RR_SPEED_SENSOR);
     /* Create Swi */
-    Swi_Params swiParams_CALIBRADOR;
-    Swi_Params_init(&swiParams_CALIBRADOR);
-    swiFUNC_CALIBRADOR = Swi_create(swiFuncCALIBRADOR, &swiParams_CALIBRADOR, NULL);
-
-    Swi_Params swiParams_READ_ROTA;
-    Swi_Params_init(&swiParams_READ_ROTA);
-    swiFUNC_READ_ROTA = Swi_create(swiFuncREADROTA, &swiParams_READ_ROTA, NULL);
+//    Swi_Params swiParams_CALIBRADOR;
+//    Swi_Params_init(&swiParams_CALIBRADOR);
+//    swiFUNC_CALIBRADOR = Swi_create(swiFuncCALIBRADOR, &swiParams_CALIBRADOR, NULL);
 //
-    Swi_Params swiParams_R1;
-    Swi_Params_init(&swiParams_R1);
-    swiFUNC_R1 = Swi_create(swiFuncR1, &swiParams_R1, NULL);
+//    Swi_Params swiParams_READ_ROTA;
+//    Swi_Params_init(&swiParams_READ_ROTA);
+//    swiFUNC_READ_ROTA = Swi_create(swiFuncREADROTA, &swiParams_READ_ROTA, NULL);
+////
+//    Swi_Params swiParams_R1;
+//    Swi_Params_init(&swiParams_R1);
+//    swiFUNC_R1 = Swi_create(swiFuncR1, &swiParams_R1, NULL);
+////
+//    Swi_Params swiParams_R2;
+//    Swi_Params_init(&swiParams_R2);
+//    swiFUNC_R2 = Swi_create(swiFuncR2, &swiParams_R2, NULL);
 //
-    Swi_Params swiParams_R2;
-    Swi_Params_init(&swiParams_R2);
-    swiFUNC_R2 = Swi_create(swiFuncR2, &swiParams_R2, NULL);
-
-    Swi_Params swiParams_R3;
-    Swi_Params_init(&swiParams_R3);
-    swiFUNC_R3 = Swi_create(swiFuncR3, &swiParams_R3, NULL);
-
-    Swi_Params swiParams_R4;
-    Swi_Params_init(&swiParams_R4);
-    swiFUNC_R4 = Swi_create(swiFuncR4, &swiParams_R4, NULL);
+//    Swi_Params swiParams_R3;
+//    Swi_Params_init(&swiParams_R3);
+//    swiFUNC_R3 = Swi_create(swiFuncR3, &swiParams_R3, NULL);
+//
+//    Swi_Params swiParams_R4;
+//    Swi_Params_init(&swiParams_R4);
+//    swiFUNC_R4 = Swi_create(swiFuncR4, &swiParams_R4, NULL);
 
     Swi_enable();
 
@@ -782,11 +801,11 @@ int main(void)
     clkParams_R4.period=TASK_R4_PERIODO;
     clkTask_R4 = Clock_create(swiFuncR4,1,&clkParams_R4,NULL);
     /* Create Hwi */
-//    Hwi_Params hwiParams;
-//    Hwi_Params_init(&hwiParams);
-//    hwiParams.enableInt = TRUE;
-//    Hwi_create(INT_NUMBER, isrFunc, &hwiParams, NULL);
-//    Hwi_enableInterrupt(INT_NUMBER);
+    Hwi_Params hwiParams_USER_CONTROL;
+    Hwi_Params_init(&hwiParams_USER_CONTROL);
+    hwiParams_USER_CONTROL.enableInt = TRUE;
+    Hwi_create(INT_NUMBER_GPIO_0_A, ISR_USER_CONTROL, &hwiParams_USER_CONTROL, NULL);
+    Hwi_enableInterrupt(INT_NUMBER_GPIO_0_A);
 
     /*  TASKS  */
 
@@ -875,60 +894,70 @@ void AppGpioCallbackFxn(void)
 void tskCALIBRADOR(){
     while(1){
         if(cflag_Calibrador == STATUS_POST){
+            GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_0, GPIO_PIN_HIGH);
+            GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_1, GPIO_PIN_HIGH);
+            GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_2, GPIO_PIN_HIGH);
+            GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_3, GPIO_PIN_HIGH);
             UART_printStatus("TSK_CALIBRADOR\n");
-            AppDelay(DELAY_VALUE*100);
+            UART_printf("SAMPLE: %d\n",number_of_sample_current);
             cflag_Calibrador=STATUS_PEND;
+            number_of_sample_current += 1;
             Semaphore_pend(semTask_CALIBRADOR, BIOS_WAIT_FOREVER);
         }
     }
 }
 void tskREADROTA(){
     while(1){
-        if(cflag_Read_Rota==STATUS_POST){
-            UART_printStatus("TSK_READ_ROTA\n");
-            AppDelay(DELAY_VALUE*100);
-            cflag_Read_Rota=STATUS_PEND;
-            Semaphore_pend(semTask_READ_ROTA, BIOS_WAIT_FOREVER);
+        if(cflag_init_read_rota == TRUE){
+            if(cflag_Read_Rota==STATUS_POST){
+                UART_printStatus("TSK_READ_ROTA\n");
+                cflag_Read_Rota=STATUS_PEND;
+                Semaphore_pend(semTask_READ_ROTA, BIOS_WAIT_FOREVER);
+            }
         }
     }
 }
 void tskR1(){
     while(1){
-        if(cflag_R1 == STATUS_POST){
-            UART_printStatus("TSK_R1\n");
-            AppDelay(DELAY_VALUE*100);
-            cflag_R1 = STATUS_PEND;
-            Semaphore_pend(semTask_R1, BIOS_WAIT_FOREVER);
+        if(cflag_init_R1 == TRUE){
+            if(cflag_R1 == STATUS_POST){
+                UART_printStatus("TSK_R1\n");
+                cflag_R1 = STATUS_PEND;
+                Semaphore_pend(semTask_R1, BIOS_WAIT_FOREVER);
+            }
         }
     }
 }
 void tskR2(){
     while(1){
-        if(cflag_R2 == STATUS_POST){
-            UART_printStatus("TSK_R2\n");
-            AppDelay(DELAY_VALUE*100);
-            cflag_R2 = STATUS_PEND;
-            Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
+        if(cflag_init_R2 == TRUE){
+            if(cflag_R2 == STATUS_POST){
+                UART_printStatus("TSK_R2\n");
+                cflag_R2 = STATUS_PEND;
+                Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
+            }
         }
     }
 }
 void tskR3(){
     while(1){
-        if(cflag_R3 == STATUS_POST){
-            UART_printStatus("TSK_R3\n");
-            AppDelay(DELAY_VALUE*100);
-            cflag_R3 = STATUS_PEND;
-            Semaphore_pend(semTask_R3, BIOS_WAIT_FOREVER);
+        if(cflag_init_R3 == TRUE){
+            if(cflag_R2 == STATUS_POST){
+                UART_printStatus("TSK_R2\n");
+                cflag_R2 = STATUS_PEND;
+                Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
+            }
         }
     }
 }
 void tskR4(){
     while(1){
-        if(cflag_R4 == STATUS_POST){
-            UART_printStatus("TSK_R4\n");
-            AppDelay(DELAY_VALUE*100);
-            cflag_R4 = STATUS_PEND;
-            Semaphore_pend(semTask_R4, BIOS_WAIT_FOREVER);
+        if(cflag_init_R4 == TRUE){
+            if(cflag_R4 == STATUS_POST){
+                UART_printStatus("TSK_R4\n");
+                cflag_R4 = STATUS_PEND;
+                Semaphore_pend(semTask_R4, BIOS_WAIT_FOREVER);
+            }
         }
     }
 }
@@ -937,41 +966,78 @@ void swiFuncCALIBRADOR(){
     if(cflag_Calibrador == STATUS_PEND){
         UART_printStatus("SWI_CALIBRADOR\n");
         cflag_Calibrador = STATUS_POST;
-        Semaphore_post(semTask_CALIBRADOR);
+        if(number_of_sample_current < NUMBER_OF_SAMPLE){
+
+            Semaphore_post(semTask_CALIBRADOR);
+        }else{
+            cflag_init_read_rota = TRUE;
+            GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_0, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_1, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_2, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_3, GPIO_PIN_LOW);
+        }
     }
 }
 void swiFuncREADROTA(){
-    if(cflag_Read_Rota == STATUS_PEND){
-        UART_printStatus("SWI_READ_ROTA\n");
-        cflag_Read_Rota = STATUS_POST;
-        Semaphore_post(semTask_READ_ROTA);
+    if(cflag_init_read_rota == TRUE){
+        if(cflag_Read_Rota == STATUS_PEND){
+                UART_printStatus("SWI_READ_ROTA\n");
+                cflag_Read_Rota = STATUS_POST;
+                Semaphore_post(semTask_READ_ROTA);
+            }
     }
 }
 void swiFuncR1(){
-    if(cflag_R1 == STATUS_PEND){
-        UART_printStatus("SWI_R1\n");
-        cflag_R1 = STATUS_POST;
-        Semaphore_post(semTask_R1);
+    if(cflag_init_R1 == TRUE){
+        if(cflag_R1 == STATUS_PEND){
+            UART_printStatus("SWI_R1\n");
+            cflag_R1 = STATUS_POST;
+            Semaphore_post(semTask_R1);
+        }
     }
 }
 void swiFuncR2(){
-    if(cflag_R2 == STATUS_PEND){
-        UART_printStatus("SWI_R2\n");
-        cflag_R2 = STATUS_POST;
-        Semaphore_post(semTask_R2);
+    if(cflag_init_R2 == TRUE){
+        if(cflag_R2 == STATUS_PEND){
+            UART_printStatus("SWI_R2\n");
+            cflag_R2 = STATUS_POST;
+            Semaphore_post(semTask_R2);
+        }
     }
 }
 void swiFuncR3(){
-    if(cflag_R3 == STATUS_PEND){
-        UART_printStatus("SWI_R3\n");
-        cflag_R3 = STATUS_POST;
-        Semaphore_post(semTask_R3);
+    if(cflag_init_R3 == TRUE){
+        if(cflag_R3 == STATUS_PEND){
+            UART_printStatus("SWI_R3\n");
+            cflag_R3 = STATUS_POST;
+            Semaphore_post(semTask_R3);
+        }
     }
 }
 void swiFuncR4(){
-    if(cflag_R4 == STATUS_PEND){
-        UART_printStatus("SWI_R4\n");
-        cflag_R4 = STATUS_POST;
-        Semaphore_post(semTask_R4);
+    if(cflag_init_R4 == TRUE){
+        if(cflag_R4 == STATUS_PEND){
+            UART_printStatus("SWI_R4\n");
+            cflag_R4 = STATUS_POST;
+            Semaphore_post(semTask_R4);
+        }
     }
+}
+/*  ---------------  ISR  ----------------- */
+void ISR_SIGNAL_FL_SPEED_SENSOR(){
+        UART_printStatus("ISR FL OK");
+        GPIOPinIntClear(SOC_GPIO_3_REGS, GPIO_INT_LINE_1, SIGNAL_FL_SPEED_SENSOR);
+}
+void ISR_SIGNAL_FR_SPEED_SENSOR(){
+
+}
+void ISR_SIGNAL_RL_SPEED_SENSOR(){
+
+}
+void ISR_SIGNAL_RR_SPEED_SENSOR(){
+
+}
+void ISR_USER_CONTROL(){
+    UART_printStatus("ISR USER CONTROL OK");
+    GPIOPinIntClear(SOC_GPIO_0_REGS, GPIO_INT_LINE_1, USER_CONTROL);
 }
