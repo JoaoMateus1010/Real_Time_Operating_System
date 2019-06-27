@@ -76,6 +76,11 @@
 #include <ti/sysbios/knl/Semaphore.h>
 #include <ti/drv/i2c/I2C.h>
 #include <ti/drv/i2c/soc/I2C_soc.h>
+#include <MPU_6050_Register.h>
+#include <math.h>
+#include <ftoa.h>
+#include <convert.h>
+#include <string.h>
 #if defined(SOC_AM65XX) || defined(SOC_J721E)
 #include <ti/drv/sciclient/sciclient.h>
 #endif
@@ -132,19 +137,21 @@
 #define INT_NUMBER_GPIO_3_A (62)
 #define INT_NUMBER_GPIO_3_B (63)
 
-#define TASK_CALIBRADOR_PRIORIDADE  (5)
-#define TASK_READ_ROTA_PRIORIDADE   (4)
-#define TASK_R1_PRIORIDADE          (2)
-#define TASK_R2_PRIORIDADE          (2)
-#define TASK_R3_PRIORIDADE          (2)
-#define TASK_R4_PRIORIDADE          (2)
+#define TASK_CALIBRADOR_PRIORIDADE          (5)
+#define TASK_READ_ROTA_PRIORIDADE           (4)
+#define TASK_R1_PRIORIDADE                  (2)
+#define TASK_R2_PRIORIDADE                  (2)
+#define TASK_R3_PRIORIDADE                  (2)
+#define TASK_R4_PRIORIDADE                  (2)
+#define TASK_READ_MPU_PRIORIDADE            (7)
 
-#define TASK_CALIBRADOR_PERIODO  (10)
-#define TASK_READ_ROTA_PERIODO   (1000)
-#define TASK_R1_PERIODO          (1)
-#define TASK_R2_PERIODO          (1)
-#define TASK_R3_PERIODO          (1)
-#define TASK_R4_PERIODO          (1)
+#define TASK_CALIBRADOR_PERIODO         (10)
+#define TASK_READ_ROTA_PERIODO          (5*1000)
+#define TASK_R1_PERIODO                 (2)
+#define TASK_R2_PERIODO                 (2)
+#define TASK_R3_PERIODO                 (2)
+#define TASK_R4_PERIODO                 (2)
+#define TASK_READ_MPU_PERIODO           (1)
 
 #define STATUS_PEND     (0)
 #define STATUS_POST     (1)
@@ -152,6 +159,36 @@
 #define NUMBER_OF_SAMPLE (5)
 
 #define NUMBER_TIMER_MAX_WAITING    (5)
+
+#define ROTA_NONE   (0)
+#define ROTA_1      (1)
+#define ROTA_2      (2)
+#define ROTA_3      (3)
+#define ROTA_4      (4)
+
+#define MODE1           0x00
+
+#define PRE_SCALE       0xFE
+
+#define LED0_ON_L       0x06
+#define LED0_ON_H       0x07
+#define LED0_OFF_L      0x08
+#define LED0_OFF_H      0x09
+
+#define LED1_ON_L       0x0A
+#define LED1_ON_H       0x0B
+#define LED1_OFF_L      0x0C
+#define LED1_OFF_H      0x0D
+
+#define LED2_ON_L       0x0E
+#define LED2_ON_H       0x0F
+#define LED2_OFF_L      0x10
+#define LED2_OFF_H      0x11
+
+#define LED3_ON_L       0x12
+#define LED3_ON_H       0x13
+#define LED3_OFF_L      0x14
+#define LED3_OFF_H      0x15
 //-------------------------  FIM Defines Final Project   --------------------
 /**********************************************************************
  ************************** Internal functions ************************
@@ -166,17 +203,20 @@ void tskR1();
 void tskR2();
 void tskR3();
 void tskR4();
+void tskreadMPU();
 void swiFuncCALIBRADOR();
 void swiFuncREADROTA();
 void swiFuncR1();
 void swiFuncR2();
 void swiFuncR3();
 void swiFuncR4();
+void swireadMPU();
+float convertValRegToFloat(int val,int LSB);
 
-void ISR_SIGNAL_FL_SPEED_SENSOR();
-void ISR_SIGNAL_FR_SPEED_SENSOR();
-void ISR_SIGNAL_RL_SPEED_SENSOR();
-void ISR_SIGNAL_RR_SPEED_SENSOR();
+//void ISR_SIGNAL_FL_SPEED_SENSOR();
+//void ISR_SIGNAL_FR_SPEED_SENSOR();
+//void ISR_SIGNAL_RL_SPEED_SENSOR();
+//void ISR_SIGNAL_RR_SPEED_SENSOR();
 void ISR_USER_CONTROL();
 /* Callback function */
 void AppGpioCallbackFxn(void);
@@ -518,6 +558,37 @@ static void Board_initGPIO(void)
 /**********************************************************************
  ************************** Global Variables **************************
  **********************************************************************/
+const unsigned CheckIfSigned[33]=
+{0x00000000,
+0x00000001,0x00000002,0x00000004,0x00000008,
+0x00000010,0x00000020,0x00000040,0x00000080,
+0x00000100,0x00000200,0x00000400,0x00000800,
+0x00001000,0x00002000,0x00004000,0x00008000,
+0x00010000,0x00020000,0x00040000,0x00080000,
+0x00100000,0x00200000,0x00400000,0x00800000,
+0x01000000,0x02000000,0x04000000,0x08000000,
+0x10000000,0x20000000,0x40000000,0x80000000};
+const unsigned ConvertToSigned[32]=
+{0xffffffff,
+0xfffffffe,0xfffffffc,0xfffffff8,0xfffffff0,
+0xffffffe0,0xffffffc0,0xffffff80,0xffffff00,
+0xfffffe00,0xfffffc00,0xfffff800,0xfffff000,
+0xffffe000,0xffffc000,0xffff8000,0xffff0000,
+0xfffe0000,0xfffc0000,0xfff80000,0xfff00000,
+0xffe00000,0xffc00000,0xff800000,0xff000000,
+0xfe000000,0xfc000000,0xf8000000,0xf0000000,
+0xe0000000,0xc0000000,0x80000000};
+const unsigned digits2bits[33]=
+{0x00000000,
+0x00000001,0x00000003,0x00000007,0x0000000f,
+0x0000001f,0x0000003f,0x0000007f,0x000000ff,
+0x000001ff,0x000003ff,0x000007ff,0x00000fff,
+0x00001fff,0x00003fff,0x00007fff,0x0000ffff,
+0x0001ffff,0x0003ffff,0x0007ffff,0x000fffff,
+0x001fffff,0x003fffff,0x007fffff,0x00ffffff,
+0x01ffffff,0x03ffffff,0x07ffffff,0x0fffffff,
+0x1fffffff,0x3fffffff,0x7fffffff,0xffffffff};
+
 volatile uint32_t gpio_intr_triggered = 0;
 uint32_t gpioBaseAddr;
 uint32_t gpioPin;
@@ -528,6 +599,7 @@ Task_Handle task_R1;
 Task_Handle task_R2;
 Task_Handle task_R3;
 Task_Handle task_R4;
+Task_Handle task_READ_MPU;
 
 Swi_Handle swiFUNC_CALIBRADOR;
 Swi_Handle swiFUNC_READ_ROTA;
@@ -543,6 +615,7 @@ Task_Params task_R1_Params;
 Task_Params task_R2_Params;
 Task_Params task_R3_Params;
 Task_Params task_R4_Params;
+Task_Params task_READ_MPU_Params;
 
 Semaphore_Handle semTask_CALIBRADOR;
 Semaphore_Handle semTask_READ_ROTA;
@@ -550,6 +623,7 @@ Semaphore_Handle semTask_R1;
 Semaphore_Handle semTask_R2;
 Semaphore_Handle semTask_R3;
 Semaphore_Handle semTask_R4;
+Semaphore_Handle semTask_READ_MPU;
 
 
 Clock_Handle clkTask_CALIBRADOR;
@@ -558,6 +632,7 @@ Clock_Handle clkTask_R1;
 Clock_Handle clkTask_R2;
 Clock_Handle clkTask_R3;
 Clock_Handle clkTask_R4;
+Clock_Handle clkTask_READ_MPU;
 
 I2C_HwAttrs i2c_cfg_MPU_6065;
 I2C_HwAttrs i2c_cfg_PCB9685;
@@ -568,6 +643,7 @@ uint8_t cflag_R1;
 uint8_t cflag_R2;
 uint8_t cflag_R3;
 uint8_t cflag_R4;
+uint8_t cflag_READ_MPU;
 
 uint8_t number_of_sample_current = 0;
 
@@ -576,8 +652,29 @@ u_int8_t cflag_init_R1 = FALSE;
 u_int8_t cflag_init_R2 = FALSE;
 u_int8_t cflag_init_R3 = FALSE;
 u_int8_t cflag_init_R4 = FALSE;
+u_int8_t cflag_init_READ_MPU = FALSE;
 
 u_int8_t cflag_number_count = 0;
+
+u_int8_t ROTA = ROTA_NONE;
+
+u_int8_t cflag_isr_bt;
+
+float inertial_X_ACCEL = 0;
+float inertial_Y_ACCEL = 0;
+float inertial_Z_ACCEL = 0;
+
+float inertial_X_GYRO = 0;
+float inertial_Y_GYRO = 0;
+float inertial_Z_GYRO = 0;
+
+float current_X_ACCEL = 0;
+float current_Y_ACCEL = 0;
+float current_Z_ACCEL = 0;
+
+float current_X_GYRO = 0;
+float current_Y_GYRO = 0;
+float current_Z_GYRO = 0;
 /*
  *  ======== test function ========
  */
@@ -650,6 +747,208 @@ int main()
 }
 
 #ifdef USE_BIOS
+uint8_t readSensor(I2C_Handle h, uint8_t reg){
+    uint8_t rxData = 0;
+    uint8_t txData = 0;
+    I2C_Transaction t;
+    int16_t transferStatus;
+    I2C_transactionInit(&t);
+    memset(&txData, 0x00, sizeof(txData));
+    t.slaveAddress = MPU_6050_SLAVE_ADDR;
+    t.writeBuf = &txData;
+    t.writeCount = 1;
+    t.readBuf = &rxData;
+    t.readCount = 1;
+    t.timeout = 1000U;
+    txData = reg;
+    transferStatus = I2C_transfer(h, &t);
+    if(I2C_STS_SUCCESS != transferStatus){
+        //UART_printf("\n Data Transfer failed with transfer status %d \n",transferStatus);
+    }
+    return rxData;
+}
+
+void writeSensor(I2C_Handle h, uint8_t reg, uint8_t val){
+    uint8_t txData[2] = {0,0};
+    I2C_Transaction t;
+    int16_t transferStatus;
+    I2C_transactionInit(&t);
+    //memset(&txData, 0x00, sizeof(txData));
+
+    t.slaveAddress = MPU_6050_SLAVE_ADDR;
+    t.writeBuf = &txData;
+    t.writeCount = 2;
+    t.readCount = 0;
+    t.timeout = 1000U;
+    txData[0] = reg;
+    txData[1] = val;
+
+    transferStatus = I2C_transfer(h, &t);
+
+    if(I2C_STS_SUCCESS != transferStatus){
+           //UART_printf("\n Data Transfer failed with transfer status %d \n",transferStatus);
+       }
+
+}
+
+void IMUSetUp(){
+    I2C_Params i2cParams;
+    I2C_Handle handle;
+    I2C_Params_init(&i2cParams);
+    //i2cParams.bitRate = I2C_400kHz;
+    handle = I2C_open(I2C_MPU_6065_INSTANCE, &i2cParams);
+    if(handle == NULL) UART_printf("ERROR");
+
+//    UART_printf("Init Acc/Gyro Setup... \n");
+//    UART_printf("Device Reset... \n");
+    writeSensor(handle, PWR_MGMT_1, 0x00);
+//    UART_printf("Accelerometer Config... \n");
+    writeSensor(handle, ACCEL_CONFIG, 0x10);
+//    UART_printf("Gyro Config... \n");
+    writeSensor(handle, GYRO_CONFIG, 0x10);
+    I2C_close(handle);
+//    UART_printf("Acc/Gyro Setup Ended... \n");
+}
+float readACCEL_X(){
+    float ret = 0;
+    uint16_t number_to_return = 0;
+    uint8_t high = 0;
+    uint8_t low = 0;
+    I2C_Params i2cParams;
+    I2C_Handle handle = NULL;
+    I2C_Params_init(&i2cParams);
+    handle = I2C_open(I2C_MPU_6065_INSTANCE, &i2cParams);
+    high = readSensor(handle, ACCEL_XOUT_H);
+    low = readSensor(handle, ACCEL_XOUT_L);
+    number_to_return |=high;
+    number_to_return = number_to_return<<8;
+    number_to_return |= low;
+    ret = convertValRegToFloat(number_to_return, LSB_SENSITIVITY_ACCEL_8G);
+    I2C_close(handle);
+    return ret;
+}
+float readACCEL_Y(){
+    float ret = 0;
+        uint16_t number_to_return = 0;
+        uint8_t high = 0;
+        uint8_t low = 0;
+        I2C_Params i2cParams;
+        I2C_Handle handle = NULL;
+        I2C_Params_init(&i2cParams);
+        handle = I2C_open(I2C_MPU_6065_INSTANCE, &i2cParams);
+        high = readSensor(handle, ACCEL_YOUT_H);
+        low = readSensor(handle, ACCEL_YOUT_L);
+        number_to_return |=high;
+        number_to_return = number_to_return<<8;
+        number_to_return |= low;
+        ret = convertValRegToFloat(number_to_return, LSB_SENSITIVITY_ACCEL_8G);
+        I2C_close(handle);
+        return ret;
+}
+float readACCEL_Z(){
+    float ret = 0;
+        uint16_t number_to_return = 0;
+        uint8_t high = 0;
+        uint8_t low = 0;
+        I2C_Params i2cParams;
+        I2C_Handle handle = NULL;
+        I2C_Params_init(&i2cParams);
+        handle = I2C_open(I2C_MPU_6065_INSTANCE, &i2cParams);
+        high = readSensor(handle, ACCEL_ZOUT_H);
+        low = readSensor(handle, ACCEL_ZOUT_L);
+        number_to_return |=high;
+        number_to_return = number_to_return<<8;
+        number_to_return |= low;
+        ret = convertValRegToFloat(number_to_return, LSB_SENSITIVITY_ACCEL_8G);
+        I2C_close(handle);
+        return ret;
+}
+
+float readGYRO_X(){
+    float ret = 0;
+        uint16_t number_to_return = 0;
+        uint8_t high = 0;
+        uint8_t low = 0;
+        I2C_Params i2cParams;
+        I2C_Handle handle = NULL;
+        I2C_Params_init(&i2cParams);
+        handle = I2C_open(I2C_MPU_6065_INSTANCE, &i2cParams);
+        high = readSensor(handle, GYRO_XOUT_H);
+        low = readSensor(handle, GYRO_XOUT_L);
+        number_to_return |=high;
+        number_to_return = number_to_return<<8;
+        number_to_return |= low;
+        ret = convertValRegToFloat(number_to_return, LSB_SENSITIVITY_GYRO_1000);
+        I2C_close(handle);
+        return ret;
+}
+float readGYRO_Y(){
+    float ret = 0;
+            uint16_t number_to_return = 0;
+            uint8_t high = 0;
+            uint8_t low = 0;
+            I2C_Params i2cParams;
+            I2C_Handle handle = NULL;
+            I2C_Params_init(&i2cParams);
+            handle = I2C_open(I2C_MPU_6065_INSTANCE, &i2cParams);
+            high = readSensor(handle, GYRO_YOUT_H);
+            low = readSensor(handle, GYRO_YOUT_L);
+            number_to_return |=high;
+            number_to_return = number_to_return<<8;
+            number_to_return |= low;
+            ret = convertValRegToFloat(number_to_return, LSB_SENSITIVITY_GYRO_1000);
+            I2C_close(handle);
+            return ret;
+}
+float readGYRO_Z(){
+    float ret = 0;
+            uint16_t number_to_return = 0;
+            uint8_t high = 0;
+            uint8_t low = 0;
+            I2C_Params i2cParams;
+            I2C_Handle handle = NULL;
+            I2C_Params_init(&i2cParams);
+            handle = I2C_open(I2C_MPU_6065_INSTANCE, &i2cParams);
+            high = readSensor(handle, GYRO_ZOUT_H);
+            low = readSensor(handle, GYRO_ZOUT_L);
+            number_to_return |=high;
+            number_to_return = number_to_return<<8;
+            number_to_return |= low;
+            ret = convertValRegToFloat(number_to_return, LSB_SENSITIVITY_GYRO_1000);
+            I2C_close(handle);
+            return ret;
+}
+float convertValRegToFloat(int val,int LSB){
+    int temp;
+    temp = val & CheckIfSigned[16];
+    if (temp != 0)
+        temp = (val | ConvertToSigned[16-1]);
+    else
+        temp=val;
+    float ret = (temp+0.0)/LSB;
+    return ret;
+}
+float convertValRegToFloatGYRO(int val,int LSB){
+    int temp;
+    temp = val & CheckIfSigned[16];
+    if (temp != 0)
+        temp = (val | ConvertToSigned[16-1]);
+    else
+        temp=val;
+    float ret = (temp+0.0)/LSB;
+    return ret;
+}
+int convertBinarioToDecimal(int bin){
+return 0;
+}
+int expNumber(int base,int exp){
+    int number_to_return = base;
+    for(int i=0;i<exp;i++){
+        number_to_return *=number_to_return;
+    }
+    return number_to_return;
+}
+
 /*
  *  ======== main ========
  */
@@ -689,22 +988,22 @@ int main(void)
         GPIODirModeSet(SOC_GPIO_0_REGS, USER_CONTROL, GPIO_CFG_INPUT);
         GPIOIntTypeSet(SOC_GPIO_0_REGS, USER_CONTROL, GPIO_INT_TYPE_RISE_EDGE);
         GPIOPinIntEnable(SOC_GPIO_0_REGS, GPIO_INT_LINE_1, USER_CONTROL);
-
-        GPIODirModeSet(SOC_GPIO_0_REGS, SIGNAL_FL_SPEED_SENSOR, GPIO_CFG_INPUT);
-        GPIOIntTypeSet(SOC_GPIO_0_REGS, SIGNAL_FL_SPEED_SENSOR, GPIO_INT_TYPE_RISE_EDGE);
-        GPIOPinIntEnable(SOC_GPIO_0_REGS, GPIO_INT_LINE_1, SIGNAL_FL_SPEED_SENSOR);
-
-        GPIODirModeSet(SOC_GPIO_0_REGS, SIGNAL_FR_SPEED_SENSOR, GPIO_CFG_INPUT);
-        GPIOIntTypeSet(SOC_GPIO_0_REGS, SIGNAL_FR_SPEED_SENSOR, GPIO_INT_TYPE_RISE_EDGE);
-        GPIOPinIntEnable(SOC_GPIO_0_REGS, GPIO_INT_LINE_1, SIGNAL_FR_SPEED_SENSOR);
-
-        GPIODirModeSet(SOC_GPIO_0_REGS, SIGNAL_RL_SPEED_SENSOR, GPIO_CFG_INPUT);
-        GPIOIntTypeSet(SOC_GPIO_0_REGS, SIGNAL_RL_SPEED_SENSOR, GPIO_INT_TYPE_RISE_EDGE);
-        GPIOPinIntEnable(SOC_GPIO_0_REGS, GPIO_INT_LINE_1, SIGNAL_RL_SPEED_SENSOR);
-
-        GPIODirModeSet(SOC_GPIO_0_REGS, SIGNAL_RR_SPEED_SENSOR, GPIO_CFG_INPUT);
-        GPIOIntTypeSet(SOC_GPIO_0_REGS, SIGNAL_RR_SPEED_SENSOR, GPIO_INT_TYPE_RISE_EDGE);
-        GPIOPinIntEnable(SOC_GPIO_0_REGS, GPIO_INT_LINE_1, SIGNAL_RR_SPEED_SENSOR);
+//
+//        GPIODirModeSet(SOC_GPIO_3_REGS, SIGNAL_FL_SPEED_SENSOR, GPIO_CFG_INPUT);
+//        GPIOIntTypeSet(SOC_GPIO_3_REGS, SIGNAL_FL_SPEED_SENSOR, GPIO_INT_TYPE_RISE_EDGE);
+//        GPIOPinIntEnable(SOC_GPIO_3_REGS, GPIO_INT_LINE_1, SIGNAL_FL_SPEED_SENSOR);
+//
+//        GPIODirModeSet(SOC_GPIO_1_REGS, SIGNAL_FR_SPEED_SENSOR, GPIO_CFG_INPUT);
+//        GPIOIntTypeSet(SOC_GPIO_1_REGS, SIGNAL_FR_SPEED_SENSOR, GPIO_INT_TYPE_RISE_EDGE);
+//        GPIOPinIntEnable(SOC_GPIO_1_REGS, GPIO_INT_LINE_1, SIGNAL_FR_SPEED_SENSOR);
+//
+//        GPIODirModeSet(SOC_GPIO_1_REGS, SIGNAL_RL_SPEED_SENSOR, GPIO_CFG_INPUT);
+//        GPIOIntTypeSet(SOC_GPIO_1_REGS, SIGNAL_RL_SPEED_SENSOR, GPIO_INT_TYPE_RISE_EDGE);
+//        GPIOPinIntEnable(SOC_GPIO_1_REGS, GPIO_INT_LINE_1, SIGNAL_RL_SPEED_SENSOR);
+//
+//        GPIODirModeSet(SOC_GPIO_1_REGS, SIGNAL_RR_SPEED_SENSOR, GPIO_CFG_INPUT);
+//        GPIOIntTypeSet(SOC_GPIO_1_REGS, SIGNAL_RR_SPEED_SENSOR, GPIO_INT_TYPE_RISE_EDGE);
+//        GPIOPinIntEnable(SOC_GPIO_1_REGS, GPIO_INT_LINE_1, SIGNAL_RR_SPEED_SENSOR);
     /* Create Swi */
 //    Swi_Params swiParams_CALIBRADOR;
 //    Swi_Params_init(&swiParams_CALIBRADOR);
@@ -764,6 +1063,10 @@ int main(void)
     semParams_R4.mode = Semaphore_Mode_BINARY;
     semTask_R4 = Semaphore_create(1,&semParams_R4,NULL);
 
+    Semaphore_Params semParams_READ_MPU;
+    Semaphore_Params_init(&semParams_READ_MPU);
+    semParams_READ_MPU.mode = Semaphore_Mode_BINARY;
+    semTask_READ_MPU = Semaphore_create(1,&semParams_READ_MPU,NULL);
     /* Create CloclkParams*/
     Clock_Params clkParams_CALIBRADOR;
     Clock_Params_init(&clkParams_CALIBRADOR);
@@ -776,13 +1079,13 @@ int main(void)
     clkParams_READ_ROTA.startFlag=TRUE;
     clkParams_READ_ROTA.period=TASK_READ_ROTA_PERIODO;
     clkTask_READ_ROTA = Clock_create(swiFuncREADROTA,1,&clkParams_READ_ROTA,NULL);
-////
+
     Clock_Params clkParams_R1;
     Clock_Params_init(&clkParams_R1);
     clkParams_R1.startFlag=TRUE;
     clkParams_R1.period=TASK_R1_PERIODO;
     clkTask_R1 = Clock_create(swiFuncR1,1,&clkParams_R1,NULL);
-//
+
     Clock_Params clkParams_R2;
     Clock_Params_init(&clkParams_R2);
     clkParams_R2.startFlag=TRUE;
@@ -800,12 +1103,25 @@ int main(void)
     clkParams_R4.startFlag=TRUE;
     clkParams_R4.period=TASK_R4_PERIODO;
     clkTask_R4 = Clock_create(swiFuncR4,1,&clkParams_R4,NULL);
+
+    Clock_Params clkParams_READ_MPU;
+    Clock_Params_init(&clkParams_READ_MPU);
+    clkParams_READ_MPU.startFlag=TRUE;
+    clkParams_READ_MPU.period=TASK_READ_MPU_PERIODO;
+    clkTask_READ_MPU = Clock_create(swireadMPU,1,&clkParams_READ_MPU,NULL);
+
     /* Create Hwi */
     Hwi_Params hwiParams_USER_CONTROL;
     Hwi_Params_init(&hwiParams_USER_CONTROL);
     hwiParams_USER_CONTROL.enableInt = TRUE;
     Hwi_create(INT_NUMBER_GPIO_0_A, ISR_USER_CONTROL, &hwiParams_USER_CONTROL, NULL);
     Hwi_enableInterrupt(INT_NUMBER_GPIO_0_A);
+
+//    Hwi_Params hwiParams_E_M_3;
+//    Hwi_Params_init(&hwiParams_E_M_3);
+//    hwiParams_E_M_3.enableInt = TRUE;
+//    Hwi_create(INT_NUMBER_GPIO_3_B, ISR_SIGNAL_FL_SPEED_SENSOR, &hwiParams_E_M_3, NULL);
+//    Hwi_enableInterrupt(INT_NUMBER_GPIO_3_B);
 
     /*  TASKS  */
 
@@ -815,6 +1131,7 @@ int main(void)
     Task_Params_init(&task_R2_Params);
     Task_Params_init(&task_R3_Params);
     Task_Params_init(&task_R4_Params);
+    Task_Params_init(&task_READ_MPU_Params);
 
     task_CALIBRADOR_Params.stackSize = 0x1400;
     task_READ_ROTA_Params.stackSize = 0x1400;
@@ -822,6 +1139,7 @@ int main(void)
     task_R2_Params.stackSize = 0x1400;
     task_R3_Params.stackSize = 0x1400;
     task_R4_Params.stackSize = 0x1400;
+    task_READ_MPU_Params.stackSize = 0x1400;
 
     task_CALIBRADOR_Params.priority = TASK_CALIBRADOR_PRIORIDADE;
     task_READ_ROTA_Params.priority = TASK_READ_ROTA_PRIORIDADE;
@@ -829,6 +1147,7 @@ int main(void)
     task_R2_Params.priority = TASK_R2_PRIORIDADE;
     task_R3_Params.priority = TASK_R3_PRIORIDADE;
     task_R4_Params.priority = TASK_R4_PRIORIDADE;
+    task_READ_MPU_Params.priority = TASK_R4_PRIORIDADE;
 
     task_CALIBRADOR = Task_create(tskCALIBRADOR, &task_CALIBRADOR_Params, NULL);
     task_READ_ROTA = Task_create(tskREADROTA, &task_READ_ROTA_Params, NULL);
@@ -836,6 +1155,7 @@ int main(void)
     task_R2 = Task_create(tskR2, &task_R2_Params, NULL);
     task_R3 = Task_create(tskR3, &task_R3_Params, NULL);
     task_R4 = Task_create(tskR4, &task_R4_Params, NULL);
+//    task_READ_MPU = Task_create(tskreadMPU, &task_READ_MPU_Params, NULL);
 
     cflag_Calibrador = STATUS_POST;
     cflag_Read_Rota = STATUS_POST;
@@ -843,6 +1163,7 @@ int main(void)
     cflag_R2 = STATUS_POST;
     cflag_R3 = STATUS_POST;
     cflag_R4 = STATUS_POST;
+    cflag_READ_MPU = STATUS_POST;
 
 #if defined(idkAM574x) || defined(idkAM572x) || defined(idkAM571x)
     AppGPIOInit();
@@ -898,8 +1219,16 @@ void tskCALIBRADOR(){
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_1, GPIO_PIN_HIGH);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_2, GPIO_PIN_HIGH);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_3, GPIO_PIN_HIGH);
-            UART_printStatus("TSK_CALIBRADOR\n");
             UART_printf("SAMPLE: %d\n",number_of_sample_current);
+
+            inertial_X_ACCEL += readACCEL_X();
+            inertial_Y_ACCEL += readACCEL_Y();
+            inertial_Z_ACCEL += readACCEL_Z();
+
+            inertial_X_GYRO += readGYRO_X();
+            inertial_Y_GYRO += readGYRO_Y();
+            inertial_Z_GYRO += readGYRO_Z();
+
             cflag_Calibrador=STATUS_PEND;
             number_of_sample_current += 1;
             Semaphore_pend(semTask_CALIBRADOR, BIOS_WAIT_FOREVER);
@@ -961,27 +1290,47 @@ void tskR4(){
         }
     }
 }
+void tskreadMPU(){
+    while(1){
+        if(cflag_init_READ_MPU == TRUE){
+            if(cflag_READ_MPU == STATUS_POST){
+                UART_printStatus("TSK_READ_MPU\n");
+                cflag_READ_MPU = STATUS_PEND;
+                Semaphore_pend(semTask_READ_MPU, BIOS_WAIT_FOREVER);
+            }
+        }
+    }
+}
 /*----------------- SWI   -----------------*/
 void swiFuncCALIBRADOR(){
     if(cflag_Calibrador == STATUS_PEND){
-        UART_printStatus("SWI_CALIBRADOR\n");
         cflag_Calibrador = STATUS_POST;
-        if(number_of_sample_current < NUMBER_OF_SAMPLE){
-
+        if(number_of_sample_current < NUMBER_OF_SAMPLE-1){
             Semaphore_post(semTask_CALIBRADOR);
         }else{
             cflag_init_read_rota = TRUE;
+            cflag_init_READ_MPU = TRUE;
+            inertial_X_ACCEL /= NUMBER_OF_SAMPLE;
+            inertial_Y_ACCEL /= NUMBER_OF_SAMPLE;
+            inertial_Z_ACCEL /= NUMBER_OF_SAMPLE;
+
+            inertial_X_GYRO /= NUMBER_OF_SAMPLE;
+            inertial_Y_GYRO /= NUMBER_OF_SAMPLE;
+            inertial_Z_GYRO /= NUMBER_OF_SAMPLE;
+
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_0, GPIO_PIN_LOW);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_1, GPIO_PIN_LOW);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_2, GPIO_PIN_LOW);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_3, GPIO_PIN_LOW);
         }
+    }else{
+        cflag_isr_bt +=1;
     }
 }
 void swiFuncREADROTA(){
     if(cflag_init_read_rota == TRUE){
         if(cflag_Read_Rota == STATUS_PEND){
-                UART_printStatus("SWI_READ_ROTA\n");
+                cflag_isr_bt = TRUE;
                 cflag_Read_Rota = STATUS_POST;
                 Semaphore_post(semTask_READ_ROTA);
             }
@@ -1023,21 +1372,70 @@ void swiFuncR4(){
         }
     }
 }
+void swireadMPU(){
+    if(cflag_init_READ_MPU == TRUE){
+        if(cflag_READ_MPU == STATUS_PEND){
+            UART_printStatus("SWI_R4\n");
+            cflag_READ_MPU = STATUS_POST;
+            Semaphore_post(semTask_READ_MPU);
+        }
+    }
+}
 /*  ---------------  ISR  ----------------- */
-void ISR_SIGNAL_FL_SPEED_SENSOR(){
-        UART_printStatus("ISR FL OK");
-        GPIOPinIntClear(SOC_GPIO_3_REGS, GPIO_INT_LINE_1, SIGNAL_FL_SPEED_SENSOR);
-}
-void ISR_SIGNAL_FR_SPEED_SENSOR(){
-
-}
-void ISR_SIGNAL_RL_SPEED_SENSOR(){
-
-}
-void ISR_SIGNAL_RR_SPEED_SENSOR(){
-
-}
+//void ISR_SIGNAL_FL_SPEED_SENSOR(){
+//        UART_printStatus("ISR FL OK");
+//        GPIOPinIntClear(SOC_GPIO_3_REGS, GPIO_INT_LINE_1, SIGNAL_FL_SPEED_SENSOR);
+//}
+//void ISR_SIGNAL_FR_SPEED_SENSOR(){
+//
+//}
+//void ISR_SIGNAL_RL_SPEED_SENSOR(){
+//
+//}
+//void ISR_SIGNAL_RR_SPEED_SENSOR(){
+//
+//}
 void ISR_USER_CONTROL(){
-    UART_printStatus("ISR USER CONTROL OK");
+    if(cflag_isr_bt > 50){
+        switch (ROTA){
+                case (ROTA_NONE):
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_HIGH);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
+                ROTA = ROTA_1;
+                    break;
+                case (ROTA_1):
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_HIGH);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
+                ROTA = ROTA_2;
+                    break;
+                case (ROTA_2):
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_HIGH);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
+                ROTA = ROTA_3;
+                    break;
+                case (ROTA_3):
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_HIGH);
+                ROTA = ROTA_4;
+                    break;
+                case (ROTA_4):
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
+                ROTA = ROTA_NONE;
+                    break;
+        }
+        cflag_isr_bt = 0;
+    }
     GPIOPinIntClear(SOC_GPIO_0_REGS, GPIO_INT_LINE_1, USER_CONTROL);
 }
+/* FUNC MPU */
