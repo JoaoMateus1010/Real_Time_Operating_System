@@ -1479,7 +1479,7 @@ void tskCALIBRADOR(){
         setSpeedL1(0, 0);
         setSpeedL2(0, 0);
         setSpeedL3(0, 0);
-	while(1){
+    while(1){
         if(cflag_Calibrador == STATUS_POST){
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_0, GPIO_PIN_HIGH);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_1, GPIO_PIN_HIGH);
@@ -1529,29 +1529,65 @@ void tskR1(){
             }
         }
         para();
+        ROTA = ROTA_NONE;
     }
 }
 void tskR2(){
     while(1){
         Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
-        //        if(cflag_init_R2 == TRUE){
-//            if(cflag_R2 == STATUS_POST){
-                UART_printStatus("TSK_R2\n");
-//                cflag_R2 = STATUS_PEND;
-
-//            }
-//        }
+        frente();
+            int conta = 0;
+            Task_sleep(50);
+            while(conta != 30){
+                if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                    conta = conta + 1;
+                    UART_printf("%d\n", conta);
+                    Task_sleep(10);
+                }
+            }
+            para();
+            ROTA = ROTA_NONE;
     }
 }
 void tskR3(){
     while(1){
         Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
-        //        if(cflag_init_R3 == TRUE){
-//            if(cflag_R2 == STATUS_POST){
-                UART_printStatus("TSK_R3\n");
-//                cflag_R2 = STATUS_PEND;
-//            }
-//        }
+        char buff_GYRO_Z[100];
+        int conta = 0;
+        float soma = 0;
+        float atual;
+        float base;
+        frente();
+        Task_sleep(50);
+        frente();
+        while(conta != 16){
+            if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                conta = conta + 1;
+                UART_printf("%d\n", conta);
+                Task_sleep(10);
+            }
+        }
+        para();
+        base = readGYRO_Z();
+        if(base < 0){
+            base = (base*(-1));
+        }
+        soma = 0;
+        esquerda();
+        while(soma < 90){
+            Task_sleep(40);
+            atual = readGYRO_Z();
+            if(atual < 0){
+                atual = (atual*(-1));
+            }
+            ftoa(atual, buff_GYRO_Z, 4);
+            UART_printf("%s\n", buff_GYRO_Z);
+            if(atual > (base + 1)){
+                soma = soma + (atual*0.7);
+            }
+        }
+        para();
+        ROTA = ROTA_NONE;
     }
 }
 void tskR4(){
@@ -1759,17 +1795,13 @@ void runSpaceInitToX(float finalSpace){
         T0 = TF;
         TF = Clock_getTicks();
     }
-//    setSpeedL0(0x00, 0x1);
-//    setSpeedL1(0x00, 0x1);
-//    setSpeedL2(0x00, 0x1);
-//    setSpeedL3(0x00, 0x1);
 }
 float getCurrAcellY(){
     return inertial_Y_ACCEL - readACCEL_Y();
 }
 
 char* convertFloatStr(float num){
-	char buff[100];
-	ftoa(num, buff, 2);
-	return buff;
+    char buff[100];
+    ftoa(num, buff, 2);
+    return buff;
 }
