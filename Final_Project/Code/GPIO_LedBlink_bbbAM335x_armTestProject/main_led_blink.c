@@ -145,8 +145,8 @@
 #define TASK_R4_PRIORIDADE                  (2)
 #define TASK_READ_MPU_PRIORIDADE            (7)
 
-#define TASK_CALIBRADOR_PERIODO         (10)
-#define TASK_READ_ROTA_PERIODO          (5*1000)
+#define TASK_CALIBRADOR_PERIODO         (1)
+#define TASK_READ_ROTA_PERIODO          (5*100)
 #define TASK_R1_PERIODO                 (2)
 #define TASK_R2_PERIODO                 (2)
 #define TASK_R3_PERIODO                 (2)
@@ -189,6 +189,53 @@
 #define LED3_ON_H       0x13
 #define LED3_OFF_L      0x14
 #define LED3_OFF_H      0x15
+
+#define sensorFL    21   // 3 21 - 25 p9
+#define sensorFR    17   // 1 17 - 23 p9
+#define sensorRL    16   // 1 16 - 15 p9
+#define sensorRR    28   // 1 28 - 12 p9
+
+#define frd1    8   // 2  8  - 43 p8
+#define fld1    11  // 2  11 - 42 p8
+#define rrd1    6   // 2  6  - 45 p8
+#define rld1    13  // 2  13 - 40 p8
+
+#define frd2    9   // 2  9  - 44 p8
+#define fld2    10  // 2  10 - 41 p8
+#define rrd2    7   // 2  7  - 46 p8
+#define rld2    12  // 2  12 - 39 p8
+
+#define I2C_PCA_96685_INSTANCE      2
+#define PCA_96685_SLAVE_ADDR     0x40
+
+#define PCA9685_MODE1       0x00     /**< Mode Register 1 */
+#define PCA9685_PRESCALE    0xFE    /**< Prescaler for PWM output frequency */
+
+#define LED0_ON_L           0x06     /**< LED0 output and brightness control byte 0 */
+#define LED0_ON_H           0x07     /**< LED0 output and brightness control byte 1 */
+#define LED0_OFF_L          0x08     /**< LED0 output and brightness control byte 2 */
+#define LED0_OFF_H          0x09     /**< LED0 output and brightness control byte 3 */
+
+#define LED1_ON_L           0x0A
+#define LED1_ON_H           0x0B
+#define LED1_OFF_L          0x0C
+#define LED1_OFF_H          0x0D
+
+#define LED2_ON_L           0x0E
+#define LED2_ON_H           0x0F
+#define LED2_OFF_L          0x10
+#define LED2_OFF_H          0x11
+
+#define LED3_ON_L           0x12
+#define LED3_ON_H           0x13
+#define LED3_OFF_L          0x14
+#define LED3_OFF_H          0x15
+
+#define LED4_ON_L           0x16
+#define LED4_ON_H           0x17
+#define LED4_OFF_L          0x18
+#define LED4_OFF_H          0x19
+
 //-------------------------  FIM Defines Final Project   --------------------
 /**********************************************************************
  ************************** Internal functions ************************
@@ -212,7 +259,9 @@ void swiFuncR3();
 void swiFuncR4();
 void swireadMPU();
 float convertValRegToFloat(int val,int LSB);
-
+void runSpaceInitToX(float finalSpace);
+float getCurrAcellY();
+char* convertFloatStr(float num);
 //void ISR_SIGNAL_FL_SPEED_SENSOR();
 //void ISR_SIGNAL_FR_SPEED_SENSOR();
 //void ISR_SIGNAL_RL_SPEED_SENSOR();
@@ -829,7 +878,7 @@ float readACCEL_X(){
 }
 float readACCEL_Y(){
     float ret = 0;
-        uint16_t number_to_return = 0;
+    uint16_t number_to_return = 0;
         uint8_t high = 0;
         uint8_t low = 0;
         I2C_Params i2cParams;
@@ -948,7 +997,205 @@ int expNumber(int base,int exp){
     }
     return number_to_return;
 }
+void setSpeedL0(uint8_t high, uint8_t low){
 
+    UART_printf("roda 0\n");
+    I2C_Params i2cParams;
+    I2C_Handle handle = NULL;
+//    uint8_t data = 0;
+
+    I2C_Params_init(&i2cParams);
+    handle = I2C_open(I2C_PCA_96685_INSTANCE, &i2cParams);
+    writeI2C(handle, PCA9685_MODE1, 0x10);
+    Task_sleep(1);
+    writeI2C(handle, PCA9685_PRESCALE, 0x78);
+    writeI2C(handle, LED0_ON_H, 0x00);
+    writeI2C(handle, LED0_ON_L, 0x00);
+    if(high == 0 && low == 0){
+        writeI2C(handle, LED0_OFF_H, 0x04);
+        writeI2C(handle, LED0_OFF_L, 0x00);
+    }
+    else{
+        writeI2C(handle, LED0_OFF_H, high);
+        writeI2C(handle, LED0_OFF_L, low);
+    }
+    writeI2C(handle, PCA9685_MODE1, 0x00);
+
+    I2C_close(handle);
+}
+
+void setSpeedL1(uint8_t high, uint8_t low){
+    UART_printf("roda 1\n");
+    I2C_Params i2cParams;
+    I2C_Handle handle = NULL;
+//    uint8_t data = 0;
+
+    I2C_Params_init(&i2cParams);
+    handle = I2C_open(I2C_PCA_96685_INSTANCE, &i2cParams);
+    writeI2C(handle, PCA9685_MODE1, 0x10);
+    Task_sleep(1);
+    writeI2C(handle, PCA9685_PRESCALE, 0x78);
+    writeI2C(handle, LED1_ON_H, 0x00);
+    writeI2C(handle, LED1_ON_L, 0x00);
+    if(high == 0 && low == 0){
+        writeI2C(handle, LED1_OFF_H, 0x04);
+        writeI2C(handle, LED1_OFF_L, 0x00);
+    }
+    else{
+        writeI2C(handle, LED0_OFF_H, high);
+        writeI2C(handle, LED0_OFF_L, low);
+    }
+    writeI2C(handle, PCA9685_MODE1, 0x00);
+
+    I2C_close(handle);
+}
+
+void setSpeedL2(uint8_t high, uint8_t low){
+    UART_printf("roda 2\n");
+    I2C_Params i2cParams;
+    I2C_Handle handle = NULL;
+//    uint8_t data = 0;
+
+    I2C_Params_init(&i2cParams);
+    handle = I2C_open(I2C_PCA_96685_INSTANCE, &i2cParams);
+    writeI2C(handle, PCA9685_MODE1, 0x10);
+    Task_sleep(1);
+    writeI2C(handle, PCA9685_PRESCALE, 0x78);
+    writeI2C(handle, LED2_ON_H, 0x00);
+    writeI2C(handle, LED2_ON_L, 0x00);
+    if(high == 0 && low == 0){
+        writeI2C(handle, LED2_OFF_H, 0x04);
+        writeI2C(handle, LED2_OFF_L, 0x00);
+    }
+    else{
+        writeI2C(handle, LED0_OFF_H, high);
+        writeI2C(handle, LED0_OFF_L, low);
+    }
+    writeI2C(handle, PCA9685_MODE1, 0x00);
+
+    I2C_close(handle);
+}
+
+void setSpeedL3(uint8_t high, uint8_t low){
+    UART_printf("roda 3\n");
+    I2C_Params i2cParams;
+    I2C_Handle handle = NULL;
+//    uint8_t data = 0;
+
+    I2C_Params_init(&i2cParams);
+    handle = I2C_open(I2C_PCA_96685_INSTANCE, &i2cParams);
+    writeI2C(handle, PCA9685_MODE1, 0x10);
+    Task_sleep(1);
+    writeI2C(handle, PCA9685_PRESCALE, 0x78);
+    writeI2C(handle, LED3_ON_H, 0x00);
+    writeI2C(handle, LED3_ON_L, 0x00);
+    if(high == 0 && low == 0){
+        writeI2C(handle, LED3_OFF_H, 0x04);
+        writeI2C(handle, LED3_OFF_L, 0x00);
+    }
+    else{
+        writeI2C(handle, LED0_OFF_H, high);
+        writeI2C(handle, LED0_OFF_L, low);
+    }
+    writeI2C(handle, PCA9685_MODE1, 0x00);
+
+    I2C_close(handle);
+}
+void frente(){
+    GPIOPinWrite(SOC_GPIO_2_REGS, frd1, GPIO_PIN_HIGH);
+    GPIOPinWrite(SOC_GPIO_2_REGS, fld1, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rrd1, GPIO_PIN_HIGH);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rld1, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, frd2, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, fld2, GPIO_PIN_HIGH);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rrd2, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rld2, GPIO_PIN_HIGH);
+
+}
+
+void esquerda(){
+    GPIOPinWrite(SOC_GPIO_2_REGS, frd1, GPIO_PIN_HIGH);
+    GPIOPinWrite(SOC_GPIO_2_REGS, fld1, GPIO_PIN_HIGH);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rrd1, GPIO_PIN_HIGH);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rld1, GPIO_PIN_HIGH);
+    GPIOPinWrite(SOC_GPIO_2_REGS, frd2, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, fld2, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rrd2, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rld2, GPIO_PIN_LOW);
+}
+
+void direita(){
+    GPIOPinWrite(SOC_GPIO_2_REGS, frd1, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, fld1, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rrd1, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rld1, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, frd2, GPIO_PIN_HIGH);
+    GPIOPinWrite(SOC_GPIO_2_REGS, fld2, GPIO_PIN_HIGH);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rrd2, GPIO_PIN_HIGH);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rld2, GPIO_PIN_HIGH);
+}
+
+void para(){
+    GPIOPinWrite(SOC_GPIO_2_REGS, frd1, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, fld1, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rrd1, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rld1, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, frd2, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, fld2, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rrd2, GPIO_PIN_LOW);
+    GPIOPinWrite(SOC_GPIO_2_REGS, rld2, GPIO_PIN_LOW);
+}
+uint8_t readI2C(I2C_Handle h, uint8_t reg){
+    uint8_t rxData = 0;
+    uint8_t txData = 0;
+
+    I2C_Transaction t;
+    int16_t transferStatus;
+
+    I2C_transactionInit(&t);
+
+    memset(&txData, 0x00, sizeof(txData));
+
+    t.slaveAddress = PCA_96685_SLAVE_ADDR;
+    t.writeBuf = &txData;
+    t.writeCount = 1;
+    t.readBuf = &rxData;
+    t.readCount = 1;
+    t.timeout = 1000U;
+    txData = reg;
+
+    transferStatus = I2C_transfer(h, &t);
+
+    if (I2C_STS_SUCCESS != transferStatus){
+        UART_printf("\n Data Transfer failed with transfer status %d \n", transferStatus);
+    }
+
+    return rxData;
+}
+
+void writeI2C(I2C_Handle h, uint8_t reg, uint8_t val){
+    uint8_t txData[2] = {0, 0};
+    I2C_Transaction t;
+    int16_t transferStatus;
+
+    I2C_transactionInit(&t);
+
+    memset(&txData, 0x00, sizeof(txData));
+
+    t.slaveAddress = PCA_96685_SLAVE_ADDR;
+    t.writeBuf = &txData;
+    t.writeCount = 2;
+    t.readCount = 0;
+    t.timeout = 1000U;
+    txData[0] = reg;
+    txData[1] = val;
+
+    transferStatus = I2C_transfer(h, &t);
+
+    if (I2C_STS_SUCCESS != transferStatus){
+        UART_printf("\n Data Transfer failed with transfer status %d \n", transferStatus);
+    }
+}
 /*
  *  ======== main ========
  */
@@ -988,6 +1235,21 @@ int main(void)
         GPIODirModeSet(SOC_GPIO_0_REGS, USER_CONTROL, GPIO_CFG_INPUT);
         GPIOIntTypeSet(SOC_GPIO_0_REGS, USER_CONTROL, GPIO_INT_TYPE_RISE_EDGE);
         GPIOPinIntEnable(SOC_GPIO_0_REGS, GPIO_INT_LINE_1, USER_CONTROL);
+
+        GPIODirModeSet(SOC_GPIO_3_REGS, sensorFL, GPIO_CFG_INPUT);
+        GPIODirModeSet(SOC_GPIO_1_REGS, sensorFR, GPIO_CFG_INPUT);
+        GPIODirModeSet(SOC_GPIO_1_REGS, sensorRL, GPIO_CFG_INPUT);
+        GPIODirModeSet(SOC_GPIO_1_REGS, sensorRR, GPIO_CFG_INPUT);
+
+        GPIODirModeSet(SOC_GPIO_2_REGS, frd1, GPIO_CFG_OUTPUT);
+        GPIODirModeSet(SOC_GPIO_2_REGS, fld1, GPIO_CFG_OUTPUT);
+        GPIODirModeSet(SOC_GPIO_2_REGS, rrd1, GPIO_CFG_OUTPUT);
+        GPIODirModeSet(SOC_GPIO_2_REGS, rld1, GPIO_CFG_OUTPUT);
+
+        GPIODirModeSet(SOC_GPIO_2_REGS, frd2, GPIO_CFG_OUTPUT);
+        GPIODirModeSet(SOC_GPIO_2_REGS, fld2, GPIO_CFG_OUTPUT);
+        GPIODirModeSet(SOC_GPIO_2_REGS, rrd2, GPIO_CFG_OUTPUT);
+        GPIODirModeSet(SOC_GPIO_2_REGS, rld2, GPIO_CFG_OUTPUT);
 //
 //        GPIODirModeSet(SOC_GPIO_3_REGS, SIGNAL_FL_SPEED_SENSOR, GPIO_CFG_INPUT);
 //        GPIOIntTypeSet(SOC_GPIO_3_REGS, SIGNAL_FL_SPEED_SENSOR, GPIO_INT_TYPE_RISE_EDGE);
@@ -1164,7 +1426,6 @@ int main(void)
     cflag_R3 = STATUS_POST;
     cflag_R4 = STATUS_POST;
     cflag_READ_MPU = STATUS_POST;
-
 #if defined(idkAM574x) || defined(idkAM572x) || defined(idkAM571x)
     AppGPIOInit();
 #endif
@@ -1213,7 +1474,12 @@ void AppGpioCallbackFxn(void)
 //}
 /*---------------- TASK  ----------------*/
 void tskCALIBRADOR(){
-    while(1){
+    IMUSetUp();
+        setSpeedL0(0, 0);
+        setSpeedL1(0, 0);
+        setSpeedL2(0, 0);
+        setSpeedL3(0, 0);
+	while(1){
         if(cflag_Calibrador == STATUS_POST){
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_0, GPIO_PIN_HIGH);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_1, GPIO_PIN_HIGH);
@@ -1239,7 +1505,9 @@ void tskREADROTA(){
     while(1){
         if(cflag_init_read_rota == TRUE){
             if(cflag_Read_Rota==STATUS_POST){
-                UART_printStatus("TSK_READ_ROTA\n");
+                if(cflag_isr_bt > 50){
+                    UART_printStatus("Lendo rota");
+                }
                 cflag_Read_Rota=STATUS_PEND;
                 Semaphore_pend(semTask_READ_ROTA, BIOS_WAIT_FOREVER);
             }
@@ -1248,46 +1516,53 @@ void tskREADROTA(){
 }
 void tskR1(){
     while(1){
-        if(cflag_init_R1 == TRUE){
-            if(cflag_R1 == STATUS_POST){
-                UART_printStatus("TSK_R1\n");
-                cflag_R1 = STATUS_PEND;
-                Semaphore_pend(semTask_R1, BIOS_WAIT_FOREVER);
+        Semaphore_pend(semTask_R1, BIOS_WAIT_FOREVER);
+        UART_printStatus("TSK_R1\n");
+        frente();
+        int conta = 0;
+        Task_sleep(50);
+        while(conta != 15){
+            if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                conta = conta + 1;
+                UART_printf("%d\n", conta);
+                Task_sleep(10);
             }
         }
+        para();
     }
 }
 void tskR2(){
     while(1){
-        if(cflag_init_R2 == TRUE){
-            if(cflag_R2 == STATUS_POST){
+        Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
+        //        if(cflag_init_R2 == TRUE){
+//            if(cflag_R2 == STATUS_POST){
                 UART_printStatus("TSK_R2\n");
-                cflag_R2 = STATUS_PEND;
-                Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
-            }
-        }
+//                cflag_R2 = STATUS_PEND;
+
+//            }
+//        }
     }
 }
 void tskR3(){
     while(1){
-        if(cflag_init_R3 == TRUE){
-            if(cflag_R2 == STATUS_POST){
-                UART_printStatus("TSK_R2\n");
-                cflag_R2 = STATUS_PEND;
-                Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
-            }
-        }
+        Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
+        //        if(cflag_init_R3 == TRUE){
+//            if(cflag_R2 == STATUS_POST){
+                UART_printStatus("TSK_R3\n");
+//                cflag_R2 = STATUS_PEND;
+//            }
+//        }
     }
 }
 void tskR4(){
     while(1){
-        if(cflag_init_R4 == TRUE){
-            if(cflag_R4 == STATUS_POST){
+        Semaphore_pend(semTask_R4, BIOS_WAIT_FOREVER);
+        //        if(cflag_init_R4 == TRUE){
+//            if(cflag_R4 == STATUS_POST){
                 UART_printStatus("TSK_R4\n");
-                cflag_R4 = STATUS_PEND;
-                Semaphore_pend(semTask_R4, BIOS_WAIT_FOREVER);
-            }
-        }
+//                cflag_R4 = STATUS_PEND;
+//            }
+//        }
     }
 }
 void tskreadMPU(){
@@ -1309,7 +1584,7 @@ void swiFuncCALIBRADOR(){
             Semaphore_post(semTask_CALIBRADOR);
         }else{
             cflag_init_read_rota = TRUE;
-            cflag_init_READ_MPU = TRUE;
+            cflag_Read_Rota=STATUS_POST;
             inertial_X_ACCEL /= NUMBER_OF_SAMPLE;
             inertial_Y_ACCEL /= NUMBER_OF_SAMPLE;
             inertial_Z_ACCEL /= NUMBER_OF_SAMPLE;
@@ -1318,59 +1593,93 @@ void swiFuncCALIBRADOR(){
             inertial_Y_GYRO /= NUMBER_OF_SAMPLE;
             inertial_Z_GYRO /= NUMBER_OF_SAMPLE;
 
+            char buff_i_x_a[100];
+            char buff_i_y_a[100];
+            char buff_i_z_a[100];
+
+            char buff_i_x_g[100];
+            char buff_i_y_g[100];
+            char buff_i_z_g[100];
+
+            ftoa(inertial_X_ACCEL, buff_i_x_a, 2);
+            ftoa(inertial_Y_ACCEL, buff_i_y_a, 2);
+            ftoa(inertial_Z_ACCEL, buff_i_z_a, 2);
+            ftoa(inertial_X_GYRO, buff_i_x_g, 2);
+            ftoa(inertial_Y_GYRO, buff_i_y_g, 2);
+            ftoa(inertial_Z_GYRO, buff_i_z_g, 2);
+
+//            UART_printf("I_X: %s\n",buff_i_x_a);
+//            UART_printf("I_Y: %s\n",buff_i_y_a);
+//            UART_printf("I_Z: %s\n",buff_i_z_a);
+//            UART_printf("I_X: %s\n",buff_i_x_g);
+//            UART_printf("I_Y: %s\n",buff_i_y_g);
+//            UART_printf("I_Z: %s\n",buff_i_z_g);
+
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_0, GPIO_PIN_LOW);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_1, GPIO_PIN_LOW);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_2, GPIO_PIN_LOW);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_3, GPIO_PIN_LOW);
+
         }
     }else{
         cflag_isr_bt +=1;
     }
 }
 void swiFuncREADROTA(){
-    if(cflag_init_read_rota == TRUE){
-        if(cflag_Read_Rota == STATUS_PEND){
-                cflag_isr_bt = TRUE;
-                cflag_Read_Rota = STATUS_POST;
-                Semaphore_post(semTask_READ_ROTA);
-            }
+    switch (ROTA){
+            case (ROTA_1):
+                UART_printStatus("ROTA 1\n");
+                Semaphore_post(semTask_R1);
+                break;
+            case (ROTA_2):
+                UART_printStatus("ROTA 2\n");
+                Semaphore_post(semTask_R2);
+                break;
+            case (ROTA_3):
+                UART_printStatus("ROTA 3\n");
+                Semaphore_post(semTask_R3);
+                break;
+            case (ROTA_4):
+                UART_printStatus("ROTA 4\n");
+                Semaphore_post(semTask_R4);
+                break;
     }
 }
 void swiFuncR1(){
-    if(cflag_init_R1 == TRUE){
-        if(cflag_R1 == STATUS_PEND){
-            UART_printStatus("SWI_R1\n");
-            cflag_R1 = STATUS_POST;
-            Semaphore_post(semTask_R1);
-        }
-    }
+//    if(cflag_init_R1 == TRUE){
+//        if(cflag_R1 == STATUS_PEND){
+//            UART_printStatus("SWI_R1\n");
+//            cflag_R1 = STATUS_POST;
+//            Semaphore_post(semTask_R1);
+//        }
+//    }
 }
 void swiFuncR2(){
-    if(cflag_init_R2 == TRUE){
-        if(cflag_R2 == STATUS_PEND){
-            UART_printStatus("SWI_R2\n");
-            cflag_R2 = STATUS_POST;
-            Semaphore_post(semTask_R2);
-        }
-    }
+//    if(cflag_init_R2 == TRUE){
+//        if(cflag_R2 == STATUS_PEND){
+//            UART_printStatus("SWI_R2\n");
+//            cflag_R2 = STATUS_POST;
+//            Semaphore_post(semTask_R2);
+//        }
+//    }
 }
 void swiFuncR3(){
-    if(cflag_init_R3 == TRUE){
-        if(cflag_R3 == STATUS_PEND){
-            UART_printStatus("SWI_R3\n");
-            cflag_R3 = STATUS_POST;
-            Semaphore_post(semTask_R3);
-        }
-    }
+//    if(cflag_init_R3 == TRUE){
+//        if(cflag_R3 == STATUS_PEND){
+//            UART_printStatus("SWI_R3\n");
+//            cflag_R3 = STATUS_POST;
+//            Semaphore_post(semTask_R3);
+//        }
+//    }
 }
 void swiFuncR4(){
-    if(cflag_init_R4 == TRUE){
-        if(cflag_R4 == STATUS_PEND){
-            UART_printStatus("SWI_R4\n");
-            cflag_R4 = STATUS_POST;
-            Semaphore_post(semTask_R4);
-        }
-    }
+//    if(cflag_init_R4 == TRUE){
+//        if(cflag_R4 == STATUS_PEND){
+//            UART_printStatus("SWI_R4\n");
+//            cflag_R4 = STATUS_POST;
+//            Semaphore_post(semTask_R4);
+//        }
+//    }
 }
 void swireadMPU(){
     if(cflag_init_READ_MPU == TRUE){
@@ -1438,4 +1747,29 @@ void ISR_USER_CONTROL(){
     }
     GPIOPinIntClear(SOC_GPIO_0_REGS, GPIO_INT_LINE_1, USER_CONTROL);
 }
-/* FUNC MPU */
+void runSpaceInitToX(float finalSpace){
+    float Sf = finalSpace;
+    float SCurrent = 0;
+    float T0 = Clock_getTicks();
+    float TF = Clock_getTicks();
+    UART_printf("Andou: %s",convertFloatStr(Sf));
+    while (SCurrent >= Sf){
+        SCurrent += (((getCurrAcellY())*(pow((TF-T0),(2))))/2);
+        AppLoopDelay(DELAY_VALUE);
+        T0 = TF;
+        TF = Clock_getTicks();
+    }
+//    setSpeedL0(0x00, 0x1);
+//    setSpeedL1(0x00, 0x1);
+//    setSpeedL2(0x00, 0x1);
+//    setSpeedL3(0x00, 0x1);
+}
+float getCurrAcellY(){
+    return inertial_Y_ACCEL - readACCEL_Y();
+}
+
+char* convertFloatStr(float num){
+	char buff[100];
+	ftoa(num, buff, 2);
+	return buff;
+}
