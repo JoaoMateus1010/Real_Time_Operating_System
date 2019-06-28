@@ -1517,28 +1517,12 @@ void tskREADROTA(){
 void tskR1(){
     while(1){
         Semaphore_pend(semTask_R1, BIOS_WAIT_FOREVER);
-        UART_printStatus("TSK_R1\n");
-        frente();
-        int conta = 0;
-        Task_sleep(50);
-        while(conta != 15){
-            if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
-                conta = conta + 1;
-                UART_printf("%d\n", conta);
-                Task_sleep(10);
-            }
-        }
-        para();
-        ROTA = ROTA_NONE;
-    }
-}
-void tskR2(){
-    while(1){
-        Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
-        frente();
+        if(cflag_init_R1 == TRUE){
+            UART_printStatus("TSK_R1\n");
+            frente();
             int conta = 0;
             Task_sleep(50);
-            while(conta != 30){
+            while(conta != 13){
                 if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
                     conta = conta + 1;
                     UART_printf("%d\n", conta);
@@ -1546,48 +1530,151 @@ void tskR2(){
                 }
             }
             para();
+            cflag_init_R1 = FALSE;
             ROTA = ROTA_NONE;
+        }
+    }
+}
+void tskR2(){
+    while(1){
+        Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
+        if(cflag_init_R2 == TRUE){
+            frente();
+                int conta = 0;
+                Task_sleep(50);
+                while(conta != 26){
+                    if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                        conta = conta + 1;
+                        UART_printf("%d\n", conta);
+                        Task_sleep(10);
+                    }
+                }
+                para();
+                cflag_init_R2 = FALSE;
+                ROTA = ROTA_NONE;
+        }
     }
 }
 void tskR3(){
+    Semaphore_pend(semTask_R3, BIOS_WAIT_FOREVER);
     while(1){
-        Semaphore_pend(semTask_R2, BIOS_WAIT_FOREVER);
-        char buff_GYRO_Z[100];
-        int conta = 0;
-        float soma = 0;
-        float atual;
-        float base;
-        frente();
-        Task_sleep(50);
-        frente();
-        while(conta != 16){
-            if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
-                conta = conta + 1;
-                UART_printf("%d\n", conta);
-                Task_sleep(10);
+        if(cflag_init_R3 == TRUE){
+            char buff_GYRO_Z[100];
+            int conta = 0;
+            float soma = 0;
+            float atual;
+            float base;
+            frente();
+            Task_sleep(50);
+            frente();
+            while(conta != 16){
+                if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                    conta = conta + 1;
+                    UART_printf("%d\n", conta);
+                    Task_sleep(10);
+                }
             }
-        }
-        para();
-        base = readGYRO_Z();
-        if(base < 0){
-            base = (base*(-1));
-        }
-        soma = 0;
-        esquerda();
-        while(soma < 90){
-            Task_sleep(40);
-            atual = readGYRO_Z();
-            if(atual < 0){
-                atual = (atual*(-1));
+            para();
+            base = readGYRO_Z();
+            if(base < 0){
+                base = (base*(-1));
             }
-            ftoa(atual, buff_GYRO_Z, 4);
-            UART_printf("%s\n", buff_GYRO_Z);
-            if(atual > (base + 1)){
-                soma = soma + (atual*0.7);
+            soma = 0;
+            esquerda();
+            while(soma < 90){
+                Task_sleep(40);
+                atual = readGYRO_Z();
+                if(atual < 0){
+                    atual = (atual*(-1));
+                }
+                ftoa(atual, buff_GYRO_Z, 4);
+                UART_printf("%s\n", buff_GYRO_Z);
+                if(atual > (base + 1)){
+                    soma = soma + (atual*0.7);
+                }
             }
+            para();
+            conta = 0;
+            frente();
+                    Task_sleep(50);
+                    frente();
+                    while(conta != 16){
+                        if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                            conta = conta + 1;
+                            UART_printf("%d\n", conta);
+                            Task_sleep(10);
+                        }
+                    }
+                    para();
+                    base = readGYRO_Z();
+                    if(base < 0){
+                        base = (base*(-1));
+                    }
+                    soma = 0;
+                    esquerda();
+                    base = 0;
+                    while(soma < 90){
+                        Task_sleep(40);
+                        atual = readGYRO_Z();
+                        if(atual < 0){
+                            atual = (atual*(-1));
+                        }
+                        ftoa(atual, buff_GYRO_Z, 4);
+                        UART_printf("%s\n", buff_GYRO_Z);
+                        if(atual > (base + 1)){
+                            soma = soma + (atual*0.7);
+                        }
+                    }
+                    para();
+                    conta = 0;
+                    base = 0;
+                    frente();
+                    Task_sleep(50);
+                                        frente();
+                                        while(conta != 16){
+                                            if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                                                conta = conta + 1;
+                                                UART_printf("%d\n", conta);
+                                                Task_sleep(10);
+                                            }
+                                        }
+                                        para();
+                                        conta = 0;
+                                        base = readGYRO_Z();
+                                        if(base < 0){
+                                            base = (base*(-1));
+                                        }
+                                        soma = 0;
+                                        esquerda();
+                                        base = 0;
+                                        while(soma < 90){
+                                            Task_sleep(40);
+                                            atual = readGYRO_Z();
+                                            if(atual < 0){
+                                                atual = (atual*(-1));
+                                            }
+                                            ftoa(atual, buff_GYRO_Z, 4);
+                                            UART_printf("%s\n", buff_GYRO_Z);
+                                            if(atual > (base + 1)){
+                                                soma = soma + (atual*0.7);
+                                            }
+                                        }
+                                        para();
+                                        frente();
+                                        while(conta != 16){
+                                                if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                                                    conta = conta + 1;
+                                                    UART_printf("%d\n", conta);
+                                                    Task_sleep(10);
+                                                }
+                                            }
+                                            para();
+
+                                        conta = 0;
+                                        base = 0;
+                    cflag_init_R3 = FALSE;
+            ROTA = ROTA_NONE;
         }
-        para();
-        ROTA = ROTA_NONE;
     }
 }
 void tskR4(){
@@ -1655,6 +1742,7 @@ void swiFuncCALIBRADOR(){
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_1, GPIO_PIN_LOW);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_2, GPIO_PIN_LOW);
             GPIOPinWrite(SOC_GPIO_1_REGS, USER_LED_3, GPIO_PIN_LOW);
+            ROTA = ROTA_1;
 
         }
     }else{
@@ -1665,20 +1753,42 @@ void swiFuncREADROTA(){
     switch (ROTA){
             case (ROTA_1):
                 UART_printStatus("ROTA 1\n");
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_HIGH);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
                 Semaphore_post(semTask_R1);
                 break;
             case (ROTA_2):
                 UART_printStatus("ROTA 2\n");
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_HIGH);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
                 Semaphore_post(semTask_R2);
                 break;
             case (ROTA_3):
                 UART_printStatus("ROTA 3\n");
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_HIGH);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
                 Semaphore_post(semTask_R3);
                 break;
             case (ROTA_4):
                 UART_printStatus("ROTA 4\n");
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
+            GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_HIGH);
                 Semaphore_post(semTask_R4);
                 break;
+            case (ROTA_NONE):
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
+                GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
+                    break;
     }
 }
 void swiFuncR1(){
@@ -1748,6 +1858,7 @@ void ISR_USER_CONTROL(){
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_2, GPIO_PIN_LOW);
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
+                cflag_init_R1 = TRUE;
                 ROTA = ROTA_1;
                     break;
                 case (ROTA_1):
@@ -1756,6 +1867,7 @@ void ISR_USER_CONTROL(){
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
                 ROTA = ROTA_2;
+                cflag_init_R2 = TRUE;
                     break;
                 case (ROTA_2):
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
@@ -1763,6 +1875,7 @@ void ISR_USER_CONTROL(){
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_HIGH);
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_LOW);
                 ROTA = ROTA_3;
+                cflag_init_R3 = TRUE;
                     break;
                 case (ROTA_3):
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
@@ -1770,6 +1883,7 @@ void ISR_USER_CONTROL(){
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_3, GPIO_PIN_LOW);
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_4, GPIO_PIN_HIGH);
                 ROTA = ROTA_4;
+                cflag_init_R4 = TRUE;
                     break;
                 case (ROTA_4):
                 GPIOPinWrite(SOC_GPIO_1_REGS, LED_MODE_1, GPIO_PIN_LOW);
