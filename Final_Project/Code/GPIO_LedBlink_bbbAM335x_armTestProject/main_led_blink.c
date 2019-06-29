@@ -1626,62 +1626,267 @@ void tskR3(){
                     base = 0;
                     CMD_FRENTE();
                     Task_sleep(50);
-                                        CMD_FRENTE();
-                                        while(contador != 16){
-                                            if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
-                                                contador += 1;
-                                                Task_sleep(10);
-                                            }
-                                        }
-                                        CMD_STOP();
-                                        contador = 0;
-                                        base = readGYRO_Z();
-                                        if(base < 0){
-                                            base = (base*(-1));
-                                        }
-                                        soma = 0;
-                                        CMD_left();
-                                        base = 0;
-                                        while(soma < 90){
-                                            Task_sleep(40);
-                                            atual = readGYRO_Z();
-                                            if(atual < 0){
-                                                atual = (atual*(-1));
-                                            }
-                                            ftoa(atual, buff_GYRO_Z, 4);
-                                            UART_printf("%s\n", buff_GYRO_Z);
-                                            if(atual > (base + 1)){
-                                                soma = soma + (atual*0.7);
-                                            }
-                                        }
-                                        CMD_STOP();
-                                        CMD_FRENTE();
-                                        while(contador != 16){
-                                                if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
-                                                    contador += 1;
-                                                    Task_sleep(10);
-                                                }
-                                            }
-                                            CMD_STOP();
+                    CMD_FRENTE();
+                    while(contador != 16){
+                        if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                            contador += 1;
+                            Task_sleep(10);
+                        }
+                    }
+                    CMD_STOP();
+                    contador = 0;
+                    base = readGYRO_Z();
+                    if(base < 0){
+                        base = (base*(-1));
+                    }
+                    soma = 0;
+                    CMD_left();
+                    base = 0;
+                    while(soma < 90){
+                        Task_sleep(40);
+                        atual = readGYRO_Z();
+                        if(atual < 0){
+                            atual = (atual*(-1));
+                        }
+                        ftoa(atual, buff_GYRO_Z, 4);
+                        UART_printf("%s\n", buff_GYRO_Z);
+                        if(atual > (base + 1)){
+                            soma = soma + (atual*0.7);
+                        }
+                    }
+                    CMD_STOP();
+                    CMD_FRENTE();
+                    while(contador != 16){
+                            if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                                contador += 1;
+                                Task_sleep(10);
+                            }
+                        }
+                        CMD_STOP();
 
-                                        contador = 0;
-                                        base = 0;
+                    contador = 0;
+                    base = 0;
                     cflag_init_R3 = FALSE;
             ROTA = ROTA_NONE;
         }
     }
 }
 void tskR4(){
+    char buff_GYRO_Z[100];
+    int contador = 0;
+    float soma = 0;
+    float atual;
+    float base;
     while(1){
         Semaphore_pend(semTask_R4, BIOS_WAIT_FOREVER);
-        //        if(cflag_init_R4 == TRUE){
-//            if(cflag_R4 == STATUS_POST){
-                UART_printStatus("TSK_R4\n");
-//                cflag_R4 = STATUS_PEND;
-//            }
-//        }
+        UART_printStatus("TSK_R4\n");
+        
+        if(cflag_init_R4 == TRUE){
+
+            // DESLOCAMENTO FRONTAL
+            contador = 0;
+            soma = 0;
+            CMD_FRENTE();
+            Task_sleep(50);
+            CMD_FRENTE();
+            while(contador != 4){
+                if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                    contador += 1;
+                    Task_sleep(10);
+                }
+            }
+            CMD_STOP();
+
+            // GIRO DO CARRO
+            base = readGYRO_Z();
+            if(base < 0){
+                base = (base*(-1));
+            }
+            CMD_righ();
+            while(soma < 45){
+                Task_sleep(40);
+                atual = readGYRO_Z();
+                if(atual < 0){
+                    atual = (atual*(-1));
+                }
+                ftoa(atual, buff_GYRO_Z, 4);
+                UART_printf("%s\n", buff_GYRO_Z);
+                if(atual > (base + 1)){
+                    soma = soma + (atual*0.7);
+                }
+            }
+            
+            // DESLOCAMENTO FRONTAL
+            contador = 0;
+            soma = 0;
+            CMD_FRENTE();
+            Task_sleep(50);
+            CMD_FRENTE();
+            while(contador != 5){
+                if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                    contador += 1;
+                    Task_sleep(10);
+                }
+            }
+            CMD_STOP();
+
+            // GIRO DO CARRO
+            base = readGYRO_Z();
+            if(base < 0){
+                base = (base*(-1));
+            }
+            CMD_righ();
+            while(soma < 45){
+                Task_sleep(40);
+                atual = readGYRO_Z();
+                if(atual < 0){
+                    atual = (atual*(-1));
+                }
+                ftoa(atual, buff_GYRO_Z, 4);
+                UART_printf("%s\n", buff_GYRO_Z);
+                if(atual > (base + 1)){
+                    soma = soma + (atual*0.7);
+                }
+            }
+
+            // DESLOCAMENTO FRONTAL
+            contador = 0;
+            soma = 0;
+            CMD_FRENTE();
+            Task_sleep(50);
+            CMD_FRENTE();
+            while(contador != 4){
+                if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                    contador += 1;
+                    Task_sleep(10);
+                }
+            }
+            CMD_STOP();
+
+            // GIRO DO CARRO
+            base = readGYRO_Z();
+            if(base < 0){
+                base = (base*(-1));
+            }
+            CMD_righ();
+            while(soma < 90){
+                Task_sleep(40);
+                atual = readGYRO_Z();
+                if(atual < 0){
+                    atual = (atual*(-1));
+                }
+                ftoa(atual, buff_GYRO_Z, 4);
+                UART_printf("%s\n", buff_GYRO_Z);
+                if(atual > (base + 1)){
+                    soma = soma + (atual*0.7);
+                }
+            }
+
+            // DESLOCAMENTO FRONTAL
+            contador = 0;
+            soma = 0;
+            CMD_FRENTE();
+            Task_sleep(50);
+            CMD_FRENTE();
+            while(contador != 4){
+                if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                    contador += 1;
+                    Task_sleep(10);
+                }
+            }
+            CMD_STOP();
+
+            // GIRO DO CARRO
+            base = readGYRO_Z();
+            if(base < 0){
+                base = (base*(-1));
+            }
+            CMD_righ();
+            while(soma < 90){
+                Task_sleep(40);
+                atual = readGYRO_Z();
+                if(atual < 0){
+                    atual = (atual*(-1));
+                }
+                ftoa(atual, buff_GYRO_Z, 4);
+                UART_printf("%s\n", buff_GYRO_Z);
+                if(atual > (base + 1)){
+                    soma = soma + (atual*0.7);
+                }
+            }
+
+            // DESLOCAMENTO FRONTAL
+            contador = 0;
+            soma = 0;
+            CMD_FRENTE();
+            Task_sleep(50);
+            CMD_FRENTE();
+            while(contador != 4){
+                if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                    contador += 1;
+                    Task_sleep(10);
+                }
+            }
+            CMD_STOP();
+
+            // GIRO DO CARRO
+            base = readGYRO_Z();
+            if(base < 0){
+                base = (base*(-1));
+            }
+            CMD_left();
+            while(soma < 45){
+                Task_sleep(40);
+                atual = readGYRO_Z();
+                if(atual < 0){
+                    atual = (atual*(-1));
+                }
+                ftoa(atual, buff_GYRO_Z, 4);
+                UART_printf("%s\n", buff_GYRO_Z);
+                if(atual > (base + 1)){
+                    soma = soma + (atual*0.7);
+                }
+            }
+
+            // DESLOCAMENTO FRONTAL
+            contador = 0;
+            soma = 0;
+            CMD_FRENTE();
+            Task_sleep(50);
+            CMD_FRENTE();
+            while(contador != 5){
+                if(!GPIOPinRead(SOC_GPIO_1_REGS, sensorFR)){
+                    contador += 1;
+                    Task_sleep(10);
+                }
+            }
+            CMD_STOP();
+
+            // GIRO DO CARRO
+            base = readGYRO_Z();
+            if(base < 0){
+                base = (base*(-1));
+            }
+            CMD_righ();
+            while(soma < 135){
+                Task_sleep(40);
+                atual = readGYRO_Z();
+                if(atual < 0){
+                    atual = (atual*(-1));
+                }
+                ftoa(atual, buff_GYRO_Z, 4);
+                UART_printf("%s\n", buff_GYRO_Z);
+                if(atual > (base + 1)){
+                    soma = soma + (atual*0.7);
+                }
+            }
+
+            cflag_init_R4 = FALSE;
+            ROTA = ROTA_NONE;
+        }
     }
 }
+
 void tskreadMPU(){
     while(1){
         if(cflag_init_READ_MPU == TRUE){
